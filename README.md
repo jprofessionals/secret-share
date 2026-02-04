@@ -147,18 +147,6 @@ make test-e2e-playwright-ui
 docker-compose up -d
 ```
 
-### Kubernetes
-
-See [infra/kubernetes.yaml](infra/kubernetes.yaml) for manifests.
-
-```bash
-kubectl apply -f infra/kubernetes.yaml
-```
-
-### AWS Lambda
-
-See [infra/serverless.yml](infra/serverless.yml) for serverless configuration.
-
 ## Documentation
 
 - [QUICKSTART.md](QUICKSTART.md) - Get started in 5 minutes
