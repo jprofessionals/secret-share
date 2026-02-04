@@ -1,0 +1,49 @@
+# Rust
+target/
+Cargo.lock
+**/*.rs.bk
+
+# Node
+frontend/.svelte-kit/
+frontend/build/
+node_modules/
+dist/
+.npm
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Build artifacts
+*.so
+*.dylib
+*.dll
+*.exe
+
+# Database
+*.db
+*.sqlite
+
+# Worktrees
+.worktrees/
+
+# E2E test artifacts
+e2e/node_modules/
+e2e/playwright-report/
+e2e/test-results/
+/tmp/e2e-test-context.json
