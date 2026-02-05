@@ -1,4 +1,4 @@
-use secret_share_backend::{config::Config, db::Database, run};
+use secret_share_backend::{config::Config, run};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -12,8 +12,5 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("Starting Secret Share Backend");
 
     let config = Config::from_env()?;
-    let db = Database::new(&config.database_url).await?;
-    db.migrate().await?;
-
-    run(config, db).await
+    run(config).await
 }
