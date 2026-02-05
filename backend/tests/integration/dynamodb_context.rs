@@ -1,46 +1,50 @@
-use secret_share_backend::{config::Config, db::Database, create_router, AppState};
+use secret_share_backend::{
+    config::{Config, DatabaseConfig},
+    create_router,
+    db::{DynamoDbRepository, SecretRepository},
+    AppState,
+};
 use std::sync::Arc;
-use testcontainers::{runners::AsyncRunner, ContainerAsync};
-use testcontainers_modules::postgres::Postgres;
+use testcontainers::{runners::AsyncRunner, ContainerAsync, GenericImage};
 use tokio::net::TcpListener;
 
 #[allow(dead_code)]
-pub struct TestContext {
+pub struct DynamoDbTestContext {
     pub base_url: String,
     pub client: reqwest::Client,
-    pub db: Arc<Database>,
-    _container: ContainerAsync<Postgres>,
+    pub db: Arc<dyn SecretRepository>,
+    _container: ContainerAsync<GenericImage>,
 }
 
 #[allow(dead_code)]
-impl TestContext {
+impl DynamoDbTestContext {
     pub async fn new() -> Self {
-        // Start PostgreSQL container
-        let container = Postgres::default()
+        let container = GenericImage::new("amazon/dynamodb-local", "latest")
+            .with_exposed_port(8000.into())
             .start()
             .await
-            .expect("Failed to start PostgreSQL container");
+            .expect("Failed to start DynamoDB Local container");
 
         let host = container.get_host().await.expect("Failed to get host");
-        let port = container.get_host_port_ipv4(5432).await.expect("Failed to get port");
-
-        let database_url = format!(
-            "postgres://postgres:postgres@{}:{}/postgres",
-            host, port
-        );
-
-        // Wait for database to be ready
-        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-
-        // Initialize database
-        let db = Database::new(&database_url)
+        let port = container
+            .get_host_port_ipv4(8000)
             .await
-            .expect("Failed to connect to database");
-        db.migrate().await.expect("Failed to run migrations");
+            .expect("Failed to get port");
 
-        // Create app state with Config
+        let endpoint = format!("http://{}:{}", host, port);
+        let table_name = "secrets-test";
+
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+
+        let dynamo = DynamoDbRepository::new(table_name, Some(&endpoint))
+            .await
+            .expect("Failed to connect to DynamoDB");
+
         let config = Config {
-            database_url: database_url.clone(),
+            database: DatabaseConfig::DynamoDB {
+                table: table_name.to_string(),
+                endpoint: Some(endpoint),
+            },
             base_url: "http://localhost".to_string(),
             port: 3000,
             max_secret_days: 30,
@@ -48,13 +52,12 @@ impl TestContext {
             max_failed_attempts: 10,
         };
 
-        let db = Arc::new(db);
+        let db: Arc<dyn SecretRepository> = Arc::new(dynamo);
         let state = AppState {
             db: db.clone(),
             config: Arc::new(config),
         };
 
-        // Start server on random port
         let listener = TcpListener::bind("127.0.0.1:0")
             .await
             .expect("Failed to bind to random port");
@@ -67,10 +70,9 @@ impl TestContext {
             axum::serve(listener, app).await.unwrap();
         });
 
-        // Wait for server to start
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-        TestContext {
+        DynamoDbTestContext {
             base_url,
             client: reqwest::Client::new(),
             db,

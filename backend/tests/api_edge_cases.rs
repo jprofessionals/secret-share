@@ -1,6 +1,6 @@
 mod integration;
 
-use integration::helpers::TestContext;
+use integration::TestContext;
 use serde_json::json;
 
 #[tokio::test]

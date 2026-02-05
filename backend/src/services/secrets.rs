@@ -181,7 +181,9 @@ mod tests {
 
     fn test_config() -> Config {
         Config {
-            database_url: String::new(),
+            database: crate::config::DatabaseConfig::Postgres {
+                url: String::new(),
+            },
             base_url: "https://example.com".to_string(),
             port: 3000,
             max_secret_days: 30,

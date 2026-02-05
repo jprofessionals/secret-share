@@ -1,7 +1,7 @@
 mod integration;
 
 use chrono::{Duration, Utc};
-use integration::helpers::TestContext;
+use integration::TestContext;
 use secret_share_backend::db::SecretRepository;
 use secret_share_backend::models::Secret;
 use uuid::Uuid;
