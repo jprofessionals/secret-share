@@ -34,7 +34,18 @@ impl DynamoDbTestContext {
         let endpoint = format!("http://{}:{}", host, port);
         let table_name = "secrets-test";
 
-        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+        // Wait for DynamoDB Local to be ready by polling the endpoint
+        // GitHub Actions VMs can be slower than local machines
+        let http_client = reqwest::Client::new();
+        for attempt in 1..=30 {
+            match http_client.get(&endpoint).send().await {
+                Ok(_) => break,
+                Err(_) if attempt < 30 => {
+                    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+                }
+                Err(e) => panic!("DynamoDB Local not ready after 15 seconds: {}", e),
+            }
+        }
 
         let dynamo = DynamoDbRepository::new(table_name, Some(&endpoint))
             .await
