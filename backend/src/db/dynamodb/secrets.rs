@@ -122,6 +122,13 @@ impl SecretRepository for DynamoDbRepository {
         };
 
         let secret = self.item_to_secret(&item)?;
+
+        // DynamoDB TTL doesn't guarantee immediate deletion (can take up to 48 hours).
+        // Filter out expired items to maintain consistent behavior with PostgreSQL.
+        if secret.is_expired() {
+            return Ok(None);
+        }
+
         Ok(Some(secret))
     }
 
