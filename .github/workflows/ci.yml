@@ -41,7 +41,8 @@ jobs:
 
       - name: Run DynamoDB tests
         working-directory: backend
-        run: cargo test --features dynamodb-tests
+        # Run single-threaded to avoid testcontainers concurrency issues
+        run: cargo test --features dynamodb-tests -- --test-threads=1
 
   test-frontend:
     name: Frontend Tests
