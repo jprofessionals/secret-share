@@ -12,14 +12,25 @@ pub struct DynamoDbRepository {
 
 impl DynamoDbRepository {
     pub async fn new(table_name: &str, endpoint: Option<&str>) -> Result<Self, AppError> {
-        let config = aws_config::defaults(BehaviorVersion::latest()).load().await;
-
         let client = if let Some(endpoint_url) = endpoint {
-            let dynamo_config = Builder::from(&config)
+            // For local endpoint (DynamoDB Local), build config directly with dummy credentials
+            // DynamoDB Local doesn't validate credentials but the SDK requires them
+            let dynamo_config = Builder::new()
                 .endpoint_url(endpoint_url)
+                .region(aws_sdk_dynamodb::config::Region::new("us-east-1"))
+                .credentials_provider(aws_sdk_dynamodb::config::Credentials::new(
+                    "test",
+                    "test",
+                    None,
+                    None,
+                    "test",
+                ))
+                .behavior_version(aws_sdk_dynamodb::config::BehaviorVersion::latest())
                 .build();
             Client::from_conf(dynamo_config)
         } else {
+            // For production, use standard AWS credentials chain
+            let config = aws_config::defaults(BehaviorVersion::latest()).load().await;
             Client::new(&config)
         };
 
