@@ -1,15 +1,12 @@
+#[macro_use]
 mod integration;
 
-use integration::helpers::TestContext;
 use serde_json::json;
 
-#[tokio::test]
-async fn test_wrong_passphrase_returns_401() {
-    let ctx = TestContext::new().await;
-
+test_both_databases!(test_wrong_passphrase_returns_401, |ctx| async move {
     // Create a secret
     let create_response = ctx
-        .client
+        .client()
         .post(ctx.url("/api/secrets"))
         .json(&json!({
             "secret": "my-secret"
@@ -23,7 +20,7 @@ async fn test_wrong_passphrase_returns_401() {
 
     // Try with wrong passphrase
     let response = ctx
-        .client
+        .client()
         .post(ctx.url(&format!("/api/secrets/{}", id)))
         .json(&json!({
             "passphrase": "wrong-passphrase-here"
@@ -33,14 +30,11 @@ async fn test_wrong_passphrase_returns_401() {
         .unwrap();
 
     assert_eq!(response.status(), 401);
-}
+});
 
-#[tokio::test]
-async fn test_not_found_returns_404() {
-    let ctx = TestContext::new().await;
-
+test_both_databases!(test_not_found_returns_404, |ctx| async move {
     let response = ctx
-        .client
+        .client()
         .post(ctx.url("/api/secrets/00000000-0000-0000-0000-000000000000"))
         .json(&json!({
             "passphrase": "any-passphrase-here"
@@ -50,15 +44,12 @@ async fn test_not_found_returns_404() {
         .unwrap();
 
     assert_eq!(response.status(), 404);
-}
+});
 
-#[tokio::test]
-async fn test_max_views_reached_deletes_secret() {
-    let ctx = TestContext::new().await;
-
+test_both_databases!(test_max_views_reached_deletes_secret, |ctx| async move {
     // Create secret with max_views=1
     let create_response = ctx
-        .client
+        .client()
         .post(ctx.url("/api/secrets"))
         .json(&json!({
             "secret": "one-time-secret",
@@ -75,7 +66,7 @@ async fn test_max_views_reached_deletes_secret() {
 
     // First retrieval succeeds
     let r1 = ctx
-        .client
+        .client()
         .post(ctx.url(&format!("/api/secrets/{}", id)))
         .json(&json!({ "passphrase": passphrase }))
         .send()
@@ -85,21 +76,18 @@ async fn test_max_views_reached_deletes_secret() {
 
     // Second retrieval fails (secret deleted)
     let r2 = ctx
-        .client
+        .client()
         .post(ctx.url(&format!("/api/secrets/{}", id)))
         .json(&json!({ "passphrase": passphrase }))
         .send()
         .await
         .unwrap();
     assert_eq!(r2.status(), 404);
-}
+});
 
-#[tokio::test]
-async fn test_health_check() {
-    let ctx = TestContext::new().await;
-
+test_both_databases!(test_health_check, |ctx| async move {
     let response = ctx
-        .client
+        .client()
         .get(ctx.url("/health"))
         .send()
         .await
@@ -107,15 +95,12 @@ async fn test_health_check() {
 
     assert_eq!(response.status(), 200);
     assert_eq!(response.text().await.unwrap(), "OK");
-}
+});
 
-#[tokio::test]
-async fn test_extend_secret_success() {
-    let ctx = TestContext::new().await;
-
+test_both_databases!(test_extend_secret_success, |ctx| async move {
     // Create extendable secret
     let create_response = ctx
-        .client
+        .client()
         .post(ctx.url("/api/secrets"))
         .json(&json!({
             "secret": "test secret",
@@ -134,7 +119,7 @@ async fn test_extend_secret_success() {
 
     // Extend the secret
     let extend_response = ctx
-        .client
+        .client()
         .post(ctx.url(&format!("/api/secrets/{}/extend", id)))
         .json(&json!({
             "passphrase": passphrase,
@@ -148,15 +133,12 @@ async fn test_extend_secret_success() {
     assert_eq!(extend_response.status(), 200);
     let extended: serde_json::Value = extend_response.json().await.unwrap();
     assert_eq!(extended["max_views"], 10);
-}
+});
 
-#[tokio::test]
-async fn test_extend_non_extendable_secret_returns_403() {
-    let ctx = TestContext::new().await;
-
+test_both_databases!(test_extend_non_extendable_secret_returns_403, |ctx| async move {
     // Create non-extendable secret
     let create_response = ctx
-        .client
+        .client()
         .post(ctx.url("/api/secrets"))
         .json(&json!({
             "secret": "test secret",
@@ -173,7 +155,7 @@ async fn test_extend_non_extendable_secret_returns_403() {
 
     // Try to extend
     let extend_response = ctx
-        .client
+        .client()
         .post(ctx.url(&format!("/api/secrets/{}/extend", id)))
         .json(&json!({
             "passphrase": passphrase,
@@ -184,15 +166,12 @@ async fn test_extend_non_extendable_secret_returns_403() {
         .unwrap();
 
     assert_eq!(extend_response.status(), 403);
-}
+});
 
-#[tokio::test]
-async fn test_extend_wrong_passphrase_returns_401() {
-    let ctx = TestContext::new().await;
-
+test_both_databases!(test_extend_wrong_passphrase_returns_401, |ctx| async move {
     // Create secret
     let create_response = ctx
-        .client
+        .client()
         .post(ctx.url("/api/secrets"))
         .json(&json!({
             "secret": "test secret",
@@ -207,7 +186,7 @@ async fn test_extend_wrong_passphrase_returns_401() {
 
     // Try to extend with wrong passphrase
     let extend_response = ctx
-        .client
+        .client()
         .post(ctx.url(&format!("/api/secrets/{}/extend", id)))
         .json(&json!({
             "passphrase": "wrong-passphrase",
@@ -218,15 +197,12 @@ async fn test_extend_wrong_passphrase_returns_401() {
         .unwrap();
 
     assert_eq!(extend_response.status(), 401);
-}
+});
 
-#[tokio::test]
-async fn test_retrieve_returns_extendable_info() {
-    let ctx = TestContext::new().await;
-
+test_both_databases!(test_retrieve_returns_extendable_info, |ctx| async move {
     // Create extendable secret
     let create_response = ctx
-        .client
+        .client()
         .post(ctx.url("/api/secrets"))
         .json(&json!({
             "secret": "test secret",
@@ -242,7 +218,7 @@ async fn test_retrieve_returns_extendable_info() {
 
     // Retrieve and check extendable field is present
     let retrieve_response = ctx
-        .client
+        .client()
         .post(ctx.url(&format!("/api/secrets/{}", id)))
         .json(&json!({ "passphrase": passphrase }))
         .send()
@@ -253,15 +229,12 @@ async fn test_retrieve_returns_extendable_info() {
     let body: serde_json::Value = retrieve_response.json().await.unwrap();
     assert_eq!(body["extendable"], true);
     assert!(body["expires_at"].is_string());
-}
+});
 
-#[tokio::test]
-async fn test_wrong_passphrase_twice_no_view_consumed() {
-    let ctx = TestContext::new().await;
-
+test_both_databases!(test_wrong_passphrase_twice_no_view_consumed, |ctx| async move {
     // Create secret with max_views=3
     let create_response = ctx
-        .client
+        .client()
         .post(ctx.url("/api/secrets"))
         .json(&json!({
             "secret": "test-secret",
@@ -278,7 +251,7 @@ async fn test_wrong_passphrase_twice_no_view_consumed() {
     // Two wrong attempts
     for _ in 0..2 {
         let response = ctx
-            .client
+            .client()
             .post(ctx.url(&format!("/api/secrets/{}", id)))
             .json(&json!({ "passphrase": "wrong-passphrase" }))
             .send()
@@ -289,7 +262,7 @@ async fn test_wrong_passphrase_twice_no_view_consumed() {
 
     // Correct attempt should still show 3 views remaining (none consumed)
     let response = ctx
-        .client
+        .client()
         .post(ctx.url(&format!("/api/secrets/{}", id)))
         .json(&json!({ "passphrase": passphrase }))
         .send()
@@ -299,15 +272,12 @@ async fn test_wrong_passphrase_twice_no_view_consumed() {
     assert_eq!(response.status(), 200);
     let body: serde_json::Value = response.json().await.unwrap();
     assert_eq!(body["views_remaining"], 2); // 3 - 1 (this view) = 2
-}
+});
 
-#[tokio::test]
-async fn test_wrong_passphrase_three_times_consumes_view() {
-    let ctx = TestContext::new().await;
-
+test_both_databases!(test_wrong_passphrase_three_times_consumes_view, |ctx| async move {
     // Create secret with max_views=3
     let create_response = ctx
-        .client
+        .client()
         .post(ctx.url("/api/secrets"))
         .json(&json!({
             "secret": "test-secret",
@@ -324,7 +294,7 @@ async fn test_wrong_passphrase_three_times_consumes_view() {
     // Three wrong attempts (3rd consumes a view)
     for _ in 0..3 {
         let response = ctx
-            .client
+            .client()
             .post(ctx.url(&format!("/api/secrets/{}", id)))
             .json(&json!({ "passphrase": "wrong-passphrase" }))
             .send()
@@ -335,7 +305,7 @@ async fn test_wrong_passphrase_three_times_consumes_view() {
 
     // Correct attempt should show only 1 view remaining (3 - 1 consumed - 1 this view = 1)
     let response = ctx
-        .client
+        .client()
         .post(ctx.url(&format!("/api/secrets/{}", id)))
         .json(&json!({ "passphrase": passphrase }))
         .send()
@@ -345,15 +315,12 @@ async fn test_wrong_passphrase_three_times_consumes_view() {
     assert_eq!(response.status(), 200);
     let body: serde_json::Value = response.json().await.unwrap();
     assert_eq!(body["views_remaining"], 1);
-}
+});
 
-#[tokio::test]
-async fn test_correct_passphrase_resets_failed_attempts() {
-    let ctx = TestContext::new().await;
-
+test_both_databases!(test_correct_passphrase_resets_failed_attempts, |ctx| async move {
     // Create secret with max_views=5
     let create_response = ctx
-        .client
+        .client()
         .post(ctx.url("/api/secrets"))
         .json(&json!({
             "secret": "test-secret",
@@ -369,7 +336,7 @@ async fn test_correct_passphrase_resets_failed_attempts() {
 
     // Two wrong attempts
     for _ in 0..2 {
-        ctx.client
+        ctx.client()
             .post(ctx.url(&format!("/api/secrets/{}", id)))
             .json(&json!({ "passphrase": "wrong" }))
             .send()
@@ -379,7 +346,7 @@ async fn test_correct_passphrase_resets_failed_attempts() {
 
     // Correct attempt (resets counter, uses 1 view)
     let response = ctx
-        .client
+        .client()
         .post(ctx.url(&format!("/api/secrets/{}", id)))
         .json(&json!({ "passphrase": passphrase }))
         .send()
@@ -389,7 +356,7 @@ async fn test_correct_passphrase_resets_failed_attempts() {
 
     // Two more wrong attempts (counter was reset, so still free)
     for _ in 0..2 {
-        ctx.client
+        ctx.client()
             .post(ctx.url(&format!("/api/secrets/{}", id)))
             .json(&json!({ "passphrase": "wrong" }))
             .send()
@@ -399,7 +366,7 @@ async fn test_correct_passphrase_resets_failed_attempts() {
 
     // Should still have 3 views remaining (5 - 1 used - 1 this view = 3)
     let response = ctx
-        .client
+        .client()
         .post(ctx.url(&format!("/api/secrets/{}", id)))
         .json(&json!({ "passphrase": passphrase }))
         .send()
@@ -409,15 +376,12 @@ async fn test_correct_passphrase_resets_failed_attempts() {
     assert_eq!(response.status(), 200);
     let body: serde_json::Value = response.json().await.unwrap();
     assert_eq!(body["views_remaining"], 3);
-}
+});
 
-#[tokio::test]
-async fn test_wrong_passphrase_deletes_secret_when_views_depleted() {
-    let ctx = TestContext::new().await;
-
+test_both_databases!(test_wrong_passphrase_deletes_secret_when_views_depleted, |ctx| async move {
     // Create secret with max_views=1
     let create_response = ctx
-        .client
+        .client()
         .post(ctx.url("/api/secrets"))
         .json(&json!({
             "secret": "test-secret",
@@ -434,7 +398,7 @@ async fn test_wrong_passphrase_deletes_secret_when_views_depleted() {
     // 3 wrong attempts: 2 free + 1 that consumes the only view
     for i in 0..3 {
         let response = ctx
-            .client
+            .client()
             .post(ctx.url(&format!("/api/secrets/{}", id)))
             .json(&json!({ "passphrase": "wrong" }))
             .send()
@@ -451,7 +415,7 @@ async fn test_wrong_passphrase_deletes_secret_when_views_depleted() {
 
     // Correct passphrase should now return 404 (secret deleted)
     let response = ctx
-        .client
+        .client()
         .post(ctx.url(&format!("/api/secrets/{}", id)))
         .json(&json!({ "passphrase": passphrase }))
         .send()
@@ -459,15 +423,12 @@ async fn test_wrong_passphrase_deletes_secret_when_views_depleted() {
         .unwrap();
 
     assert_eq!(response.status(), 404);
-}
+});
 
-#[tokio::test]
-async fn test_unlimited_views_deleted_after_max_failed_attempts() {
-    let ctx = TestContext::new().await;
-
+test_both_databases!(test_unlimited_views_deleted_after_max_failed_attempts, |ctx| async move {
     // Create secret with unlimited views (max_views: null)
     let create_response = ctx
-        .client
+        .client()
         .post(ctx.url("/api/secrets"))
         .json(&json!({
             "secret": "test-secret"
@@ -484,7 +445,7 @@ async fn test_unlimited_views_deleted_after_max_failed_attempts() {
     // After 10 wrong attempts, secret should be deleted
     for i in 0..10 {
         let response = ctx
-            .client
+            .client()
             .post(ctx.url(&format!("/api/secrets/{}", id)))
             .json(&json!({ "passphrase": "wrong" }))
             .send()
@@ -498,4 +459,4 @@ async fn test_unlimited_views_deleted_after_max_failed_attempts() {
             assert_eq!(response.status(), 404, "Attempt 10 should return 404 (deleted)");
         }
     }
-}
+});

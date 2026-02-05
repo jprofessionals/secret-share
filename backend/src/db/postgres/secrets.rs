@@ -2,13 +2,13 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
-use super::repository::SecretRepository;
-use super::Database;
+use super::PostgresRepository;
+use crate::db::SecretRepository;
 use crate::error::AppError;
 use crate::models::Secret;
 
 #[async_trait]
-impl SecretRepository for Database {
+impl SecretRepository for PostgresRepository {
     async fn create_secret(&self, secret: &Secret) -> Result<(), AppError> {
         sqlx::query(
             r#"

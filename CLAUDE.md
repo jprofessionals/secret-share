@@ -10,7 +10,7 @@ SecretShare is a secure secret-sharing service with end-to-end encryption. Users
 
 - **Backend**: Rust with Axum, SQLx (PostgreSQL), AES-256-GCM encryption, Argon2 key derivation
 - **Frontend**: Svelte 5 with SvelteKit 2, TypeScript, Vite 6, TailwindCSS 4
-- **Database**: PostgreSQL 16
+- **Database**: PostgreSQL 16 or DynamoDB
 
 ## Common Commands
 
@@ -97,6 +97,12 @@ Wrong passphrase attempts are tracked to prevent brute force attacks:
 - `MAX_SECRET_DAYS` - Maximum days a secret can exist (default: 30)
 - `MAX_SECRET_VIEWS` - Maximum view count allowed (default: 100)
 - `MAX_FAILED_ATTEMPTS` - Max wrong passphrase attempts for unlimited views secrets (default: 10)
+
+### DynamoDB (alternative to PostgreSQL)
+
+- `DYNAMODB_TABLE` - DynamoDB table name (if set, uses DynamoDB instead of PostgreSQL)
+- `DYNAMODB_ENDPOINT` - Optional endpoint URL for DynamoDB Local
+- AWS credentials via standard SDK chain (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION, or IAM role)
 
 ### Frontend
 

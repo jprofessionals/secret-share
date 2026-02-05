@@ -1,4 +1,4 @@
-import { spawn, ChildProcess, execSync } from 'child_process';
+import { spawn, execSync } from 'child_process';
 import { GenericContainer, Wait } from 'testcontainers';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -7,7 +7,8 @@ const STATE_FILE = '/tmp/e2e-test-context.json';
 const ROOT_DIR = path.resolve(__dirname, '../..');
 
 interface TestState {
-  postgresPort: number;
+  database: 'postgres' | 'dynamodb';
+  databasePort: number;
   backendPid: number;
   frontendPid: number;
   backendUrl: string;
@@ -27,12 +28,9 @@ async function waitForUrl(url: string, maxAttempts = 30): Promise<void> {
   throw new Error(`Timeout waiting for ${url}`);
 }
 
-async function globalSetup(): Promise<void> {
-  console.log('Starting E2E test infrastructure...');
-
-  // 1. Start PostgreSQL container
+async function startPostgres(): Promise<{ port: number; env: Record<string, string> }> {
   console.log('Starting PostgreSQL container...');
-  const postgresContainer = await new GenericContainer('postgres:16-alpine')
+  const container = await new GenericContainer('postgres:16-alpine')
     .withEnvironment({
       POSTGRES_PASSWORD: 'postgres',
       POSTGRES_DB: 'secretshare',
@@ -41,16 +39,54 @@ async function globalSetup(): Promise<void> {
     .withWaitStrategy(Wait.forLogMessage('database system is ready to accept connections'))
     .start();
 
-  const postgresPort = postgresContainer.getMappedPort(5432);
-  const postgresHost = postgresContainer.getHost();
-  const databaseUrl = `postgres://postgres:postgres@${postgresHost}:${postgresPort}/secretshare`;
+  const port = container.getMappedPort(5432);
+  const host = container.getHost();
+  const databaseUrl = `postgres://postgres:postgres@${host}:${port}/secretshare`;
 
-  console.log(`PostgreSQL running at ${postgresHost}:${postgresPort}`);
-  console.log(`Database URL: ${databaseUrl}`);
-
-  // Wait for database to be fully ready (beyond just log message)
-  console.log('Waiting for PostgreSQL to be fully ready...');
+  console.log(`PostgreSQL running at ${host}:${port}`);
   await new Promise((r) => setTimeout(r, 3000));
+
+  return {
+    port,
+    env: { DATABASE_URL: databaseUrl },
+  };
+}
+
+async function startDynamoDB(): Promise<{ port: number; env: Record<string, string> }> {
+  console.log('Starting DynamoDB Local container...');
+  const container = await new GenericContainer('amazon/dynamodb-local')
+    .withExposedPorts(8000)
+    .withWaitStrategy(Wait.forListeningPorts())
+    .start();
+
+  const port = container.getMappedPort(8000);
+  const host = container.getHost();
+  const endpoint = `http://${host}:${port}`;
+
+  console.log(`DynamoDB Local running at ${endpoint}`);
+  await new Promise((r) => setTimeout(r, 1000));
+
+  return {
+    port,
+    env: {
+      DYNAMODB_TABLE: 'secrets',
+      DYNAMODB_ENDPOINT: endpoint,
+      AWS_ACCESS_KEY_ID: 'test',
+      AWS_SECRET_ACCESS_KEY: 'test',
+      AWS_REGION: 'us-east-1',
+    },
+  };
+}
+
+async function globalSetup(): Promise<void> {
+  console.log('Starting E2E test infrastructure...');
+
+  const database = (process.env.E2E_DATABASE || 'dynamodb') as 'postgres' | 'dynamodb';
+  console.log(`Using database: ${database}`);
+
+  // 1. Start database container
+  const { port: databasePort, env: dbEnv } =
+    database === 'postgres' ? await startPostgres() : await startDynamoDB();
 
   // 2. Build and start backend
   console.log('Building backend...');
@@ -60,22 +96,18 @@ async function globalSetup(): Promise<void> {
   });
 
   console.log('Starting backend...');
-  const backendProcess = spawn(
-    './target/release/secret-share-backend',
-    [],
-    {
-      cwd: path.join(ROOT_DIR, 'backend'),
-      env: {
-        ...process.env,
-        DATABASE_URL: databaseUrl,
-        BASE_URL: 'http://localhost:4173',
-        PORT: '3000',
-        RUST_LOG: 'info',
-      },
-      stdio: ['ignore', 'inherit', 'inherit'],
-      detached: true,
-    }
-  );
+  const backendProcess = spawn('./target/release/secret-share-backend', [], {
+    cwd: path.join(ROOT_DIR, 'backend'),
+    env: {
+      ...process.env,
+      ...dbEnv,
+      BASE_URL: 'http://localhost:4173',
+      PORT: '3000',
+      RUST_LOG: 'info',
+    },
+    stdio: ['ignore', 'inherit', 'inherit'],
+    detached: true,
+  });
 
   backendProcess.unref();
 
@@ -96,18 +128,14 @@ async function globalSetup(): Promise<void> {
   });
 
   console.log('Starting frontend preview server...');
-  const frontendProcess = spawn(
-    'npx',
-    ['vite', 'preview', '--port', '4173', '--host'],
-    {
-      cwd: path.join(ROOT_DIR, 'frontend'),
-      env: {
-        ...process.env,
-      },
-      stdio: 'pipe',
-      detached: true,
-    }
-  );
+  const frontendProcess = spawn('npx', ['vite', 'preview', '--port', '4173', '--host'], {
+    cwd: path.join(ROOT_DIR, 'frontend'),
+    env: {
+      ...process.env,
+    },
+    stdio: 'pipe',
+    detached: true,
+  });
 
   frontendProcess.unref();
 
@@ -118,7 +146,8 @@ async function globalSetup(): Promise<void> {
 
   // Save state for teardown
   const state: TestState = {
-    postgresPort,
+    database,
+    databasePort,
     backendPid: backendProcess.pid!,
     frontendPid: frontendProcess.pid!,
     backendUrl,

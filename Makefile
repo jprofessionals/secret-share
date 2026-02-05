@@ -1,4 +1,4 @@
-.PHONY: help dev dev-stop build-backend build-frontend test clean test-e2e test-e2e-api test-e2e-playwright test-e2e-playwright-headed test-e2e-playwright-ui cleanup
+.PHONY: help dev dev-stop build-backend build-frontend test test-backend test-backend-postgres test-backend-dynamodb test-frontend clean test-e2e test-e2e-api test-e2e-playwright test-e2e-playwright-headed test-e2e-playwright-ui cleanup
 
 help: ## Vis denne hjelpemeldingen
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -36,6 +36,12 @@ build-frontend: ## Bygg frontend (Svelte)
 
 test-backend: ## Kjør backend tester
 	cd backend && cargo test
+
+test-backend-postgres: ## Kjør backend PostgreSQL integrasjonstester
+	cd backend && cargo test --features postgres-tests
+
+test-backend-dynamodb: ## Kjør backend DynamoDB integrasjonstester
+	cd backend && cargo test --features dynamodb-tests -- --test-threads=1
 
 test-frontend: ## Kjør frontend tester
 	cd frontend && npm test
