@@ -1,10 +1,10 @@
-pub mod postgres_context;
 pub mod dynamodb_context;
+pub mod postgres_context;
 #[macro_use]
 pub mod test_macro;
 
-pub use postgres_context::PostgresTestContext as TestContext;
-
+/// Trait for test contexts providing HTTP client and URL building.
+#[allow(dead_code)]
 pub trait TestContextTrait {
     fn url(&self, path: &str) -> String;
     fn client(&self) -> &reqwest::Client;

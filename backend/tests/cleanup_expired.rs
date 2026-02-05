@@ -1,14 +1,21 @@
+//! Cleanup tests for PostgreSQL only.
+//!
+//! DynamoDB uses TTL for automatic expiration, so these tests
+//! are not applicable to DynamoDB.
+
+#![cfg(feature = "postgres-tests")]
+
 mod integration;
 
 use chrono::{Duration, Utc};
-use integration::TestContext;
+use integration::postgres_context::PostgresTestContext;
 use secret_share_backend::db::SecretRepository;
 use secret_share_backend::models::Secret;
 use uuid::Uuid;
 
 #[tokio::test]
 async fn test_cleanup_expired_removes_only_expired_secrets() {
-    let ctx = TestContext::new().await;
+    let ctx = PostgresTestContext::new().await;
 
     // Create an expired secret (expired 1 hour ago)
     let expired_secret = Secret {
@@ -48,7 +55,7 @@ async fn test_cleanup_expired_removes_only_expired_secrets() {
 
 #[tokio::test]
 async fn test_cleanup_expired_returns_zero_when_no_expired() {
-    let ctx = TestContext::new().await;
+    let ctx = PostgresTestContext::new().await;
 
     // Create only valid secrets
     let valid_secret = Secret {

@@ -82,5 +82,3 @@ impl PostgresTestContext {
         format!("{}{}", self.base_url, path)
     }
 }
-
-pub type TestContext = PostgresTestContext;

@@ -1,15 +1,12 @@
+#[macro_use]
 mod integration;
 
-use integration::TestContext;
 use serde_json::json;
 
-#[tokio::test]
-async fn test_retrieve_secret_success() {
-    let ctx = TestContext::new().await;
-
+test_both_databases!(test_retrieve_secret_success, |ctx| async move {
     // Create a secret first
     let create_response = ctx
-        .client
+        .client()
         .post(ctx.url("/api/secrets"))
         .json(&json!({
             "secret": "test-secret-value",
@@ -27,7 +24,7 @@ async fn test_retrieve_secret_success() {
 
     // Retrieve the secret
     let retrieve_response = ctx
-        .client
+        .client()
         .post(ctx.url(&format!("/api/secrets/{}", id)))
         .json(&json!({
             "passphrase": passphrase,
@@ -42,15 +39,12 @@ async fn test_retrieve_secret_success() {
     let retrieve_body: serde_json::Value = retrieve_response.json().await.unwrap();
     assert_eq!(retrieve_body["secret"], "test-secret-value");
     assert_eq!(retrieve_body["views_remaining"], 4);
-}
+});
 
-#[tokio::test]
-async fn test_retrieve_decrements_view_count() {
-    let ctx = TestContext::new().await;
-
+test_both_databases!(test_retrieve_decrements_view_count, |ctx| async move {
     // Create secret with max_views=3
     let create_response = ctx
-        .client
+        .client()
         .post(ctx.url("/api/secrets"))
         .json(&json!({
             "secret": "counting-views",
@@ -68,7 +62,7 @@ async fn test_retrieve_decrements_view_count() {
 
     // First retrieval: views_remaining should be 2
     let r1 = ctx
-        .client
+        .client()
         .post(ctx.url(&format!("/api/secrets/{}", id)))
         .json(&json!({ "passphrase": passphrase, "verified_2fa": false }))
         .send()
@@ -79,7 +73,7 @@ async fn test_retrieve_decrements_view_count() {
 
     // Second retrieval: views_remaining should be 1
     let r2 = ctx
-        .client
+        .client()
         .post(ctx.url(&format!("/api/secrets/{}", id)))
         .json(&json!({ "passphrase": passphrase, "verified_2fa": false }))
         .send()
@@ -87,4 +81,4 @@ async fn test_retrieve_decrements_view_count() {
         .unwrap();
     let b2: serde_json::Value = r2.json().await.unwrap();
     assert_eq!(b2["views_remaining"], 1);
-}
+});
