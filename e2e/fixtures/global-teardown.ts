@@ -4,7 +4,8 @@ import { execSync } from 'child_process';
 const STATE_FILE = '/tmp/e2e-test-context.json';
 
 interface TestState {
-  postgresPort: number;
+  database: 'postgres' | 'dynamodb';
+  databasePort: number;
   backendPid: number;
   frontendPid: number;
   backendUrl: string;
@@ -33,14 +34,15 @@ async function globalTeardown(): Promise<void> {
       console.log('Frontend already stopped');
     }
 
-    // Stop PostgreSQL container (Docker will handle cleanup)
+    // Stop database container
+    const containerPort = state.databasePort;
     try {
-      execSync(`docker stop $(docker ps -q --filter "publish=${state.postgresPort}")`, {
+      execSync(`docker stop $(docker ps -q --filter "publish=${containerPort}")`, {
         stdio: 'pipe',
       });
-      console.log('PostgreSQL container stopped');
+      console.log(`${state.database} container stopped`);
     } catch {
-      console.log('PostgreSQL container already stopped');
+      console.log(`${state.database} container already stopped`);
     }
 
     // Clean up state file
