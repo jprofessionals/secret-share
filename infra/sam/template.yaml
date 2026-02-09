@@ -25,6 +25,8 @@ Resources:
   # DynamoDB Table
   SecretsTable:
     Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       TableName: !Sub 'secretshare-${Stage}'
       BillingMode: PAY_PER_REQUEST
@@ -89,7 +91,7 @@ Resources:
   FrontendBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub 'secretshare-frontend-${Stage}'
+      BucketName: !Sub 'secretshare-frontend-${AWS::AccountId}-${Stage}'
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true

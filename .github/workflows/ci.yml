@@ -125,6 +125,10 @@ jobs:
     needs: [test-backend-postgres, test-backend-dynamodb, test-frontend, test-e2e]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
 
@@ -161,6 +165,8 @@ jobs:
         run: npm ci && npm run build
         env:
           VITE_API_URL: ''
+          # Empty string with ?? in frontend code produces '' (empty) API_URL
+          # so fetch calls become '/api/secrets' (relative), matching CloudFront routing
 
       - name: SAM build
         working-directory: infra/sam

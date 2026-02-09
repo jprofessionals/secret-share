@@ -22,7 +22,7 @@
   let extendError = $state('');
   let extendSuccess = $state('');
 
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+  const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
 
   async function retrieveSecret(e: Event) {
     e.preventDefault();
