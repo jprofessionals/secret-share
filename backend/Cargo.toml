@@ -68,3 +68,8 @@ default = []
 lambda = ["lambda_http"]
 postgres-tests = []
 dynamodb-tests = []
+
+[[bin]]
+name = "lambda"
+path = "src/bin/lambda.rs"
+required-features = ["lambda"]
