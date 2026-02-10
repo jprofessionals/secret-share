@@ -123,3 +123,43 @@
       ansible.builtin.command:
         cmd: sudo systemctl reload caddy
       changed_when: true
+
+    - name: Create cleanup systemd service
+      become: true
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/secret-share-cleanup.service
+        content: |
+          [Unit]
+          Description=SecretShare cleanup expired secrets
+          Requires=docker.service
+          After=docker.service
+
+          [Service]
+          Type=oneshot
+          ExecStart=/usr/bin/docker exec {{ container_name }} /app/cleanup
+          User=deploy
+        mode: "0644"
+
+    - name: Create cleanup systemd timer
+      become: true
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/secret-share-cleanup.timer
+        content: |
+          [Unit]
+          Description=Run SecretShare cleanup daily
+
+          [Timer]
+          OnCalendar=daily
+          Persistent=true
+
+          [Install]
+          WantedBy=timers.target
+        mode: "0644"
+
+    - name: Enable and start cleanup timer
+      become: true
+      ansible.builtin.systemd:
+        name: secret-share-cleanup.timer
+        enabled: true
+        state: started
+        daemon_reload: true
