@@ -66,7 +66,7 @@ jobs:
         run: npm test
 
   test-e2e:
-    name: E2E Tests (DynamoDB)
+    name: E2E Tests (PostgreSQL)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -110,7 +110,7 @@ jobs:
         working-directory: e2e
         run: npm test
         env:
-          E2E_DATABASE: dynamodb
+          E2E_DATABASE: postgres
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
