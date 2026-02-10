@@ -121,7 +121,7 @@ jobs:
           retention-days: 7
 
   deploy:
-    name: Deploy to AWS
+    name: Deploy to Dev VM
     needs: [test-backend-postgres, test-backend-dynamodb, test-frontend, test-e2e]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
@@ -132,59 +132,33 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install cargo-lambda
-        run: pip3 install cargo-lambda
-
-      - name: Cache Cargo
-        uses: Swatinem/rust-cache@v2
+      - uses: actions/checkout@v4
         with:
-          workspaces: backend -> target
+          repository: jprofessionals/ansible-dev-vm-controll
+          path: ansible-controll
+          token: ${{ secrets.ANSIBLE_CONTROLL_PAT }}
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
+      - name: Install Ansible
+        run: pip install ansible
 
-      - name: Setup AWS SAM CLI
-        uses: aws-actions/setup-sam@v2
+      - name: Install Ansible collections
+        run: ansible-galaxy collection install -r infra/ansible/requirements.yml
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
-
-      - name: Build frontend
-        working-directory: frontend
-        run: npm ci && npm run build
-        env:
-          VITE_API_URL: ''
-          # Empty string with ?? in frontend code produces '' (empty) API_URL
-          # so fetch calls become '/api/secrets' (relative), matching CloudFront routing
-
-      - name: SAM build
-        working-directory: infra/sam
-        run: sam build
-
-      - name: SAM deploy
-        working-directory: infra/sam
-        run: sam deploy --no-confirm-changeset --no-fail-on-empty-changeset
-
-      - name: Get stack outputs
-        id: stack
-        working-directory: infra/sam
+      - name: Set up SSH key
         run: |
-          echo "bucket=$(aws cloudformation describe-stacks --stack-name secretshare --query 'Stacks[0].Outputs[?OutputKey==`FrontendBucketName`].OutputValue' --output text)" >> "$GITHUB_OUTPUT"
-          echo "distribution_id=$(aws cloudformation describe-stacks --stack-name secretshare --query 'Stacks[0].Outputs[?OutputKey==`CloudFrontDistributionId`].OutputValue' --output text)" >> "$GITHUB_OUTPUT"
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H ${{ vars.VM_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Deploy frontend to S3
-        run: aws s3 sync frontend/build/ "s3://${{ steps.stack.outputs.bucket }}" --delete
+      - name: Set up Vault password
+        run: echo "${{ secrets.VAULT_PASSWORD }}" > .vault_password
 
-      - name: Invalidate CloudFront cache
-        run: aws cloudfront create-invalidation --distribution-id "${{ steps.stack.outputs.distribution_id }}" --paths "/*"
+      - name: Run deploy playbook
+        working-directory: infra/ansible
+        run: >
+          ansible-playbook deploy.yml
+          --vault-password-file ../../.vault_password
+          -e ansible_controll_vars=../../ansible-controll/inventory/group_vars/all.yml
+        env:
+          VM_HOST: ${{ vars.VM_HOST }}
