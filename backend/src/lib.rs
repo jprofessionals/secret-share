@@ -8,6 +8,8 @@ pub mod services;
 
 use std::sync::Arc;
 
+use axum::Router;
+
 use crate::config::{Config, DatabaseConfig};
 use crate::db::{DynamoDbRepository, PostgresRepository, SecretRepository};
 
@@ -19,7 +21,7 @@ pub struct AppState {
     pub config: Arc<Config>,
 }
 
-pub async fn run(config: Config) -> anyhow::Result<()> {
+pub async fn build_app(config: Config) -> anyhow::Result<(Router, AppState)> {
     let db: Arc<dyn SecretRepository> = match &config.database {
         DatabaseConfig::Postgres { url } => {
             tracing::info!("Using PostgreSQL database");
@@ -36,12 +38,18 @@ pub async fn run(config: Config) -> anyhow::Result<()> {
 
     let state = AppState {
         db,
-        config: Arc::new(config.clone()),
+        config: Arc::new(config),
     };
 
-    let app = create_router(state);
+    let app = create_router(state.clone());
+    Ok((app, state))
+}
 
-    let addr = format!("0.0.0.0:{}", config.port);
+pub async fn run(config: Config) -> anyhow::Result<()> {
+    let port = config.port;
+    let (app, _state) = build_app(config).await?;
+
+    let addr = format!("0.0.0.0:{}", port);
     tracing::info!("Listening on {}", addr);
 
     let listener = tokio::net::TcpListener::bind(&addr).await?;

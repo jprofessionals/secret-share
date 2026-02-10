@@ -47,6 +47,9 @@ async-trait = "0.1"
 aws-config = { version = "1.5", features = ["behavior-version-latest"] }
 aws-sdk-dynamodb = "1.54"
 
+# AWS Lambda runtime (optional, for serverless deployment)
+lambda_http = { version = "0.14", optional = true }
+
 # OpenAPI
 utoipa = { version = "5", features = ["axum_extras", "uuid", "chrono"] }
 utoipa-swagger-ui = { version = "9", features = ["axum"] }
@@ -62,5 +65,11 @@ paste = "1.0"
 
 [features]
 default = []
+lambda = ["lambda_http"]
 postgres-tests = []
 dynamodb-tests = []
+
+[[bin]]
+name = "lambda"
+path = "src/bin/lambda.rs"
+required-features = ["lambda"]

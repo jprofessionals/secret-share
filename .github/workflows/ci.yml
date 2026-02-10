@@ -66,7 +66,7 @@ jobs:
         run: npm test
 
   test-e2e:
-    name: E2E Tests (DynamoDB)
+    name: E2E Tests (PostgreSQL)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -110,7 +110,7 @@ jobs:
         working-directory: e2e
         run: npm test
         env:
-          E2E_DATABASE: dynamodb
+          E2E_DATABASE: postgres
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
@@ -119,3 +119,46 @@ jobs:
           name: playwright-report
           path: e2e/playwright-report/
           retention-days: 7
+
+  deploy:
+    name: Deploy to Dev VM
+    needs: [test-backend-postgres, test-backend-dynamodb, test-frontend, test-e2e]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: jprofessionals/ansible-dev-vm-controll
+          path: ansible-controll
+          token: ${{ secrets.ANSIBLE_CONTROLL_PAT }}
+
+      - name: Install Ansible
+        run: pip install ansible
+
+      - name: Install Ansible collections
+        run: ansible-galaxy collection install -r infra/ansible/requirements.yml
+
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H ${{ vars.VM_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Set up Vault password
+        run: echo "${{ secrets.VAULT_PASSWORD }}" > .vault_password
+
+      - name: Run deploy playbook
+        working-directory: infra/ansible
+        run: >
+          ansible-playbook deploy.yml
+          --vault-password-file ../../.vault_password
+          -e ansible_controll_vars=../../ansible-controll/inventory/group_vars/all.yml
+        env:
+          VM_HOST: ${{ vars.VM_HOST }}

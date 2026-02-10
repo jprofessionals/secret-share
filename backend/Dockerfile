@@ -31,8 +31,9 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Copy the binary from builder
+# Copy binaries from builder
 COPY --from=builder /app/target/release/secret-share-backend /app/secret-share-backend
+COPY --from=builder /app/target/release/cleanup /app/cleanup
 
 # Create non-root user
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app

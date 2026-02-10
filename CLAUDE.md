@@ -39,9 +39,15 @@ make cleanup             # Run cleanup of expired secrets (or: cd backend && car
 make migrate             # Run migrations via sqlx-cli
 make migrate-add name=x  # Create new migration file
 
-# Deployment
-make k8s-deploy          # Deploy to Kubernetes
-make k8s-status          # Check Kubernetes status
+# Deployment (Ansible → Dev VM)
+cd infra/ansible && ansible-playbook deploy.yml --vault-password-file ../../.vault_password
+# Requires: VM_HOST env var, vault password file, ansible-controll vars accessible
+
+# AWS Serverless (SAM) - alternative deployment
+cd infra/sam && sam build     # Build Lambda function
+cd infra/sam && sam deploy    # Deploy stack to AWS
+cd infra/sam && sam validate  # Validate SAM template
+cd infra/sam && sam delete    # Delete the deployed stack
 ```
 
 ## Architecture
@@ -85,6 +91,7 @@ Wrong passphrase attempts are tracked to prevent brute force attacks:
 - `frontend/src/routes/create/CreateSecret.svelte` - Client-side encryption UI
 - `frontend/src/routes/secret/[id]/ViewSecret.svelte` - Client-side decryption UI
 - `backend/src/bin/cleanup.rs` - CLI for cleanup cron job
+- `backend/src/bin/lambda.rs` - AWS Lambda entry point
 
 ## Environment Variables
 
@@ -111,5 +118,5 @@ Wrong passphrase attempts are tracked to prevent brute force attacks:
 ## Deployment Options
 
 1. **Docker Compose** - `docker-compose.yml` for local/testing
-2. **Kubernetes** - `infra/kubernetes.yaml` with HPA, Ingress, StatefulSet
-3. **AWS Lambda** - `infra/serverless.yml` for serverless deployment
+2. **Ansible (Dev VM)** - `infra/ansible/deploy.yml` for dev VM deployment (primary)
+3. **AWS Lambda** - `infra/sam/template.yaml` for serverless deployment (alternative)

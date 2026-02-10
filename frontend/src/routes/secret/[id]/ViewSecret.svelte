@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { t, getDateLocale } from '$lib/i18n/index.svelte';
+
   let { id }: { id: string } = $props();
 
   let passphrase = $state('');
@@ -20,12 +22,12 @@
   let extendError = $state('');
   let extendSuccess = $state('');
 
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+  const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
 
   async function retrieveSecret(e: Event) {
     e.preventDefault();
     if (!passphrase.trim()) {
-      error = 'Vennligst skriv inn dekrypteringsnøkkelen';
+      error = t('view.form.errorEmpty');
       return;
     }
 
@@ -45,14 +47,14 @@
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Kunne ikke hente hemmelighet');
+        throw new Error(errorData.error || t('view.form.errorRetrieve'));
       }
 
       const data = await response.json();
       secret = data;
       showSecret = true;
     } catch (err) {
-      error = err instanceof Error ? err.message : 'En feil oppstod';
+      error = err instanceof Error ? err.message : t('view.form.errorGeneric');
     } finally {
       loading = false;
     }
@@ -60,7 +62,7 @@
 
   async function extendSecret() {
     if (addDays <= 0 && addViews <= 0) {
-      extendError = 'Vennligst angi dager eller visninger å legge til';
+      extendError = t('view.extend.errorEmpty');
       return;
     }
 
@@ -81,11 +83,11 @@
 
       if (!response.ok) {
         if (response.status === 403) {
-          extendError = 'Denne hemmeligheten kan ikke forlenges';
+          extendError = t('view.extend.errorForbidden');
         } else if (response.status === 400) {
-          extendError = 'Forlengelse overskrider maksimale grenser';
+          extendError = t('view.extend.errorLimit');
         } else {
-          extendError = 'Kunne ikke forlenge hemmelighet';
+          extendError = t('view.extend.errorGeneric');
         }
         return;
       }
@@ -95,11 +97,11 @@
         secret.expires_at = data.expires_at;
         secret.views_remaining = data.max_views ? data.max_views - data.views : null;
       }
-      extendSuccess = 'Hemmelighet forlenget';
+      extendSuccess = t('view.extend.success');
       addDays = 0;
       addViews = 0;
     } catch (err) {
-      extendError = 'Nettverksfeil';
+      extendError = t('view.extend.errorNetwork');
     } finally {
       extending = false;
     }
@@ -119,17 +121,17 @@
     <div class="bg-white rounded-lg border border-gray-200 p-6 sm:p-8 shadow-sm">
       <div class="mb-6 space-y-2">
         <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">
-          Åpne hemmelighet
+          {t('view.form.title')}
         </h2>
         <p class="text-sm text-gray-600">
-          Skriv inn dekrypteringsnøkkelen for å se hemmeligheten
+          {t('view.form.subtitle')}
         </p>
       </div>
 
       <form onsubmit={retrieveSecret} class="space-y-5">
         <div class="space-y-2">
           <label for="passphrase" class="block text-sm font-medium text-gray-900">
-            Dekrypteringsnøkkel (3 ord)
+            {t('view.form.passphraseLabel')}
           </label>
           <input
             id="passphrase"
@@ -137,10 +139,10 @@
             bind:value={passphrase}
             data-testid="passphrase-input"
             class="block w-full px-3 py-2 text-base border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-center font-mono placeholder:text-gray-400"
-            placeholder="ord1-ord2-ord3"
+            placeholder={t('view.form.passphrasePlaceholder')}
           />
           <p class="text-xs text-gray-500 text-center">
-            Nøkkelen består av tre ord separert med bindestreker
+            {t('view.form.passphraseHint')}
           </p>
         </div>
 
@@ -156,7 +158,7 @@
           data-testid="retrieve-button"
           class="w-full inline-flex items-center justify-center px-4 py-2.5 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
         >
-          {loading ? 'Åpner...' : 'Åpne hemmelighet'}
+          {loading ? t('view.form.submitting') : t('view.form.submitButton')}
         </button>
       </form>
     </div>
@@ -164,16 +166,16 @@
     <div class="bg-white rounded-lg border border-gray-200 p-8">
       <div class="mb-8">
         <h2 class="text-3xl font-bold text-gray-900 mb-2">
-          Hemmelighet hentet
+          {t('view.result.title')}
         </h2>
         <div class="space-y-1 text-gray-600">
           {#if secret.views_remaining !== null}
             <p data-testid="views-remaining">
-              Gjenværende visninger: <strong>{secret.views_remaining}</strong>
+              {t('view.result.viewsRemaining')} <strong>{secret.views_remaining}</strong>
             </p>
           {/if}
           <p data-testid="expires-at">
-            Utløper: <strong>{new Date(secret.expires_at).toLocaleString('nb-NO')}</strong>
+            {t('view.result.expires')} <strong>{new Date(secret.expires_at).toLocaleString(getDateLocale())}</strong>
           </p>
         </div>
       </div>
@@ -181,14 +183,14 @@
       <div class="bg-gray-50 border border-gray-300 rounded-lg p-6 mb-6">
         <div class="flex justify-between items-center mb-4">
           <div class="text-sm font-semibold text-gray-700">
-            Hemmelighet
+            {t('view.result.secretLabel')}
           </div>
           <button
             onclick={() => copyToClipboard(secret.secret)}
             data-testid="copy-secret-button"
             class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium"
           >
-            {copySuccess ? 'Kopiert!' : 'Kopier'}
+            {copySuccess ? t('view.result.copied') : t('view.result.copyButton')}
           </button>
         </div>
         <pre data-testid="secret-content" class="bg-white p-4 rounded-lg border border-gray-200 overflow-x-auto whitespace-pre-wrap break-words font-mono text-sm">{secret.secret}</pre>
@@ -196,30 +198,30 @@
 
       <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-5 mb-6">
         <p class="text-yellow-800 text-sm">
-          <strong>Viktig:</strong> Denne hemmeligheten vil bli slettet
+          <strong>{t('view.result.warningImportant')}</strong> {t('view.result.warningDelete')}
           {#if secret.views_remaining !== null && secret.views_remaining > 0}
-            etter {secret.views_remaining} visning{secret.views_remaining > 1 ? 'er' : ''} til
+            {t('view.result.warningViewsLeft', { count: secret.views_remaining })}
           {:else}
-            permanent etter denne visningen
+            {t('view.result.warningLastView')}
           {/if}.
-          Kopier den hvis du trenger den senere.
+          {t('view.result.warningCopy')}
         </p>
       </div>
 
       <!-- Extension section -->
       <div class="border-t border-gray-200 pt-6 mt-6">
-        <h3 class="text-lg font-semibold text-gray-900 mb-4">Forleng hemmelighet</h3>
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">{t('view.extend.title')}</h3>
 
         {#if !secret.extendable}
           <div class="bg-gray-100 p-4 rounded-lg" data-testid="extend-disabled-message">
-            <p class="text-gray-500 text-sm">Forlengelse er deaktivert av avsenderen</p>
+            <p class="text-gray-500 text-sm">{t('view.extend.disabled')}</p>
           </div>
         {:else}
           <div class="space-y-4">
             <div class="grid md:grid-cols-2 gap-4">
               <div>
                 <label for="addDays" class="block text-sm font-medium text-gray-700 mb-1">
-                  Legg til dager
+                  {t('view.extend.addDays')}
                 </label>
                 <input
                   type="number"
@@ -233,7 +235,7 @@
 
               <div>
                 <label for="addViews" class="block text-sm font-medium text-gray-700 mb-1">
-                  Legg til visninger
+                  {t('view.extend.addViews')}
                 </label>
                 <input
                   type="number"
@@ -264,7 +266,7 @@
               disabled={extending || (addDays <= 0 && addViews <= 0)}
               class="w-full px-4 py-2.5 bg-indigo-600 text-white rounded-md font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {extending ? 'Forlenger...' : 'Forleng hemmelighet'}
+              {extending ? t('view.extend.submitting') : t('view.extend.submitButton')}
             </button>
           </div>
         {/if}
@@ -275,7 +277,7 @@
           href="/create"
           class="text-indigo-600 hover:text-indigo-800 font-semibold"
         >
-          ← Del en ny hemmelighet
+          {t('view.result.newSecret')}
         </a>
       </div>
     </div>
