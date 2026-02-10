@@ -53,7 +53,6 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: backend-build
-          path: backend
 
       - name: Run PostgreSQL tests
         working-directory: backend
@@ -73,7 +72,6 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: backend-build
-          path: backend
 
       - name: Run DynamoDB tests
         working-directory: backend
@@ -112,7 +110,6 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: backend-build
-          path: backend
 
       - name: Make backend binary executable
         run: chmod +x backend/target/release/secret-share-backend
@@ -180,7 +177,6 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: backend-build
-          path: backend
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
