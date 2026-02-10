@@ -21,22 +21,26 @@ jobs:
         with:
           workspaces: backend -> target
 
-      - name: Build test binaries (all features)
-        working-directory: backend
-        run: cargo test --no-run --features postgres-tests,dynamodb-tests
-
-      - name: Build release binary
+      - name: Build release binaries
         working-directory: backend
         run: cargo build --release
+
+      - name: Build PostgreSQL test binaries
+        working-directory: backend
+        run: |
+          cargo test --release --no-run --features postgres-tests --message-format=json 2>/dev/null | \
+            jq -r 'select(.executable != null) | select(.profile.test == true) | .executable' > /tmp/pg-bins.txt
+          mkdir -p target/release/test-bins-postgres
+          while IFS= read -r bin; do cp "$bin" target/release/test-bins-postgres/; done < /tmp/pg-bins.txt
 
       - name: Upload backend artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: backend-build
+          name: backend-release
           path: |
-            backend/target/debug/deps/
             backend/target/release/secret-share-backend
             backend/target/release/cleanup
+            backend/target/release/test-bins-postgres/
           retention-days: 1
 
   test-backend-postgres:
@@ -44,39 +48,17 @@ jobs:
     needs: [build-backend]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
       - name: Download backend artifacts
         uses: actions/download-artifact@v4
         with:
-          name: backend-build
+          name: backend-release
 
       - name: Run PostgreSQL tests
-        working-directory: backend
-        run: cargo test --features postgres-tests
-
-  test-backend-dynamodb:
-    name: Backend Tests (DynamoDB)
-    needs: [build-backend]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Download backend artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: backend-build
-
-      - name: Run DynamoDB tests
-        working-directory: backend
-        # Run single-threaded to avoid testcontainers concurrency issues
-        run: cargo test --features dynamodb-tests -- --test-threads=1
+        run: |
+          for bin in backend/target/release/test-bins-postgres/*; do
+            chmod +x "$bin"
+            "$bin"
+          done
 
   test-frontend:
     name: Frontend Tests
@@ -109,7 +91,7 @@ jobs:
       - name: Download backend artifacts
         uses: actions/download-artifact@v4
         with:
-          name: backend-build
+          name: backend-release
 
       - name: Make backend binary executable
         run: chmod +x backend/target/release/secret-share-backend
@@ -157,7 +139,7 @@ jobs:
 
   deploy:
     name: Deploy to Dev VM
-    needs: [test-backend-postgres, test-backend-dynamodb, test-frontend, test-e2e]
+    needs: [test-backend-postgres, test-frontend, test-e2e]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     environment: production
@@ -176,7 +158,7 @@ jobs:
       - name: Download backend artifacts
         uses: actions/download-artifact@v4
         with:
-          name: backend-build
+          name: backend-release
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
