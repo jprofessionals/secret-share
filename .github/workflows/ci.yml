@@ -33,6 +33,14 @@ jobs:
           mkdir -p target/release/test-bins-postgres
           while IFS= read -r bin; do cp "$bin" target/release/test-bins-postgres/; done < /tmp/pg-bins.txt
 
+      - name: Build DynamoDB test binaries
+        working-directory: backend
+        run: |
+          cargo test --release --no-run --features dynamodb-tests --message-format=json 2>/dev/null | \
+            jq -r 'select(.executable != null) | select(.profile.test == true) | .executable' > /tmp/ddb-bins.txt
+          mkdir -p target/release/test-bins-dynamodb
+          while IFS= read -r bin; do cp "$bin" target/release/test-bins-dynamodb/; done < /tmp/ddb-bins.txt
+
       - name: Upload backend artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -41,6 +49,7 @@ jobs:
             backend/target/release/secret-share-backend
             backend/target/release/cleanup
             backend/target/release/test-bins-postgres/
+            backend/target/release/test-bins-dynamodb/
           retention-days: 1
 
   test-backend-postgres:
@@ -58,6 +67,24 @@ jobs:
           for bin in backend/target/release/test-bins-postgres/*; do
             chmod +x "$bin"
             "$bin"
+          done
+
+  test-backend-dynamodb:
+    name: Backend Tests (DynamoDB)
+    needs: [build-backend]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download backend artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-release
+
+      - name: Run DynamoDB tests
+        # Run single-threaded to avoid testcontainers concurrency issues
+        run: |
+          for bin in backend/target/release/test-bins-dynamodb/*; do
+            chmod +x "$bin"
+            "$bin" --test-threads=1
           done
 
   test-frontend:
@@ -139,7 +166,7 @@ jobs:
 
   deploy:
     name: Deploy to Dev VM
-    needs: [test-backend-postgres, test-frontend, test-e2e]
+    needs: [test-backend-postgres, test-backend-dynamodb, test-frontend, test-e2e]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     environment: production
