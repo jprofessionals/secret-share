@@ -16,7 +16,7 @@
   </div>
 
   <!-- Feature Cards -->
-  <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+  <div class="grid sm:grid-cols-2 gap-6 max-w-3xl mx-auto">
     <div class="bg-white p-6 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors">
       <div class="text-3xl mb-3">🔒</div>
       <h3 class="text-base font-semibold mb-2 text-gray-900">{t('home.features.encryption.title')}</h3>
@@ -33,13 +33,6 @@
       </p>
     </div>
 
-    <div class="bg-white p-6 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors sm:col-span-2 lg:col-span-1">
-      <div class="text-3xl mb-3">🛡️</div>
-      <h3 class="text-base font-semibold mb-2 text-gray-900">{t('home.features.twoFactor.title')}</h3>
-      <p class="text-sm text-gray-600 leading-relaxed">
-        {t('home.features.twoFactor.description')}
-      </p>
-    </div>
   </div>
 
   <!-- CTA Button -->

@@ -21,10 +21,6 @@ export default {
   'home.features.selfDestruct.title': 'Selvdestruerende',
   'home.features.selfDestruct.description':
     'Sett en utløpstid eller maksimalt antall visninger. Hemmeligheten slettes automatisk.',
-  'home.features.twoFactor.title': '2-faktor autentisering',
-  'home.features.twoFactor.description':
-    'Ekstra sikkerhetslag med SMS eller e-post verifisering før hemmeligheten kan åpnes.',
-
   // Home - CTA
   'home.cta.button': 'Del en hemmelighet nå',
   'home.cta.subtitle': 'Ingen registrering kreves • Gratis • Open source',

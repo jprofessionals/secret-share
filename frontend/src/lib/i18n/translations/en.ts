@@ -21,10 +21,6 @@ export default {
   'home.features.selfDestruct.title': 'Self-destructing',
   'home.features.selfDestruct.description':
     'Set an expiry time or maximum number of views. The secret is deleted automatically.',
-  'home.features.twoFactor.title': 'Two-factor authentication',
-  'home.features.twoFactor.description':
-    'Extra security layer with SMS or email verification before the secret can be opened.',
-
   // Home - CTA
   'home.cta.button': 'Share a secret now',
   'home.cta.subtitle': 'No registration required • Free • Open source',
