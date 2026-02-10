@@ -1,5 +1,5 @@
 all:
   hosts:
     devserver:
-      ansible_host: "{{ lookup('env', 'VM_HOST') | default('changeme', true) }}"
+      ansible_host: "{{ lookup('env', 'VM_HOST') | default('changeme', true) | trim }}"
       ansible_user: deploy
