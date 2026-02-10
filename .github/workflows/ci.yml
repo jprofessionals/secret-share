@@ -136,7 +136,7 @@ jobs:
         with:
           repository: jprofessionals/ansible-dev-vm-controll
           path: ansible-controll
-          token: ${{ secrets.ANSIBLE_CONTROLL_PAT }}
+          ssh-key: ${{ secrets.ANSIBLE_CONTROLL_DEPLOY_KEY }}
 
       - name: Install Ansible
         run: pip install ansible
