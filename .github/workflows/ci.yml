@@ -36,6 +36,7 @@ jobs:
           path: |
             backend/target/debug/deps/
             backend/target/release/secret-share-backend
+            backend/target/release/cleanup
           retention-days: 1
 
   test-backend-postgres:
@@ -175,6 +176,33 @@ jobs:
           path: ansible-controll
           ssh-key: ${{ secrets.ANSIBLE_CONTROLL_DEPLOY_KEY }}
 
+      - name: Download backend artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-build
+          path: backend
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm ci && npm run build
+        env:
+          VITE_API_URL: ''
+
+      - name: Prepare deploy package
+        run: |
+          mkdir -p deploy-package
+          cp backend/target/release/secret-share-backend deploy-package/
+          cp backend/target/release/cleanup deploy-package/
+          chmod +x deploy-package/secret-share-backend deploy-package/cleanup
+          cp -r frontend/dist deploy-package/frontend
+
       - name: Install Ansible
         run: pip install ansible
 
@@ -190,6 +218,10 @@ jobs:
 
       - name: Set up Vault password
         run: echo "${{ secrets.VAULT_PASSWORD }}" > .vault_password
+
+      - name: Upload deploy package to VM
+        run: |
+          rsync -az --delete deploy-package/ deploy@${{ vars.VM_HOST }}:/home/deploy/secret-share/
 
       - name: Run deploy playbook
         working-directory: infra/ansible

@@ -5,12 +5,9 @@
     - "{{ ansible_controll_vars | default('../../ansible-controll/inventory/group_vars/all.yml') }}"
   vars:
     app_name: secret-share
-    app_repo: https://github.com/jprofessionals/secret-share.git
-    app_branch: main
     app_dir: /home/deploy/secret-share
     frontend_dir: /var/www/secret-share
-    container_name: secret-share-backend
-    container_port: 3000
+    backend_port: 3000
     domain: "secret.{{ domain | default('jpro.dev') }}"
     database_url: "postgres://secret_share:{{ vault_secret_share_db_password }}@127.0.0.1:5432/secret_share_db"
     base_url: "https://{{ domain }}"
@@ -20,63 +17,6 @@
     max_failed_attempts: 10
 
   tasks:
-    - name: Clone or update repository
-      ansible.builtin.git:
-        repo: "{{ app_repo }}"
-        dest: "{{ app_dir }}"
-        version: "{{ app_branch }}"
-        force: true
-
-    - name: Build backend Docker image
-      community.docker.docker_image:
-        name: "{{ app_name }}-backend"
-        tag: latest
-        source: build
-        build:
-          path: "{{ app_dir }}/backend"
-        force_source: true
-
-    - name: Stop existing backend container
-      community.docker.docker_container:
-        name: "{{ container_name }}"
-        state: absent
-
-    - name: Start backend container
-      community.docker.docker_container:
-        name: "{{ container_name }}"
-        image: "{{ app_name }}-backend:latest"
-        state: started
-        restart_policy: unless-stopped
-        network_mode: host
-        env:
-          DATABASE_URL: "{{ database_url }}"
-          BASE_URL: "{{ base_url }}"
-          PORT: "{{ container_port | string }}"
-          RUST_LOG: "{{ rust_log }}"
-          MAX_SECRET_DAYS: "{{ max_secret_days | string }}"
-          MAX_SECRET_VIEWS: "{{ max_secret_views | string }}"
-          MAX_FAILED_ATTEMPTS: "{{ max_failed_attempts | string }}"
-
-    - name: Install Node.js (if not present)
-      become: true
-      ansible.builtin.apt:
-        name:
-          - nodejs
-          - npm
-        state: present
-
-    - name: Install frontend dependencies
-      community.general.npm:
-        path: "{{ app_dir }}/frontend"
-        ci: true
-
-    - name: Build frontend
-      ansible.builtin.command:
-        cmd: npm run build
-        chdir: "{{ app_dir }}/frontend"
-      environment:
-        VITE_API_URL: ""
-
     - name: Create frontend directory
       become: true
       ansible.builtin.file:
@@ -88,11 +28,48 @@
 
     - name: Deploy frontend files
       ansible.posix.synchronize:
-        src: "{{ app_dir }}/frontend/dist/"
+        src: "{{ app_dir }}/frontend/"
         dest: "{{ frontend_dir }}/"
         delete: true
         recursive: true
       delegate_to: "{{ inventory_hostname }}"
+
+    - name: Create backend systemd service
+      become: true
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/secret-share.service
+        content: |
+          [Unit]
+          Description=SecretShare Backend
+          After=network.target postgresql.service
+
+          [Service]
+          Type=simple
+          User=deploy
+          WorkingDirectory={{ app_dir }}
+          ExecStart={{ app_dir }}/secret-share-backend
+          Restart=on-failure
+          RestartSec=5
+          Environment=DATABASE_URL={{ database_url }}
+          Environment=BASE_URL={{ base_url }}
+          Environment=PORT={{ backend_port }}
+          Environment=RUST_LOG={{ rust_log }}
+          Environment=MAX_SECRET_DAYS={{ max_secret_days }}
+          Environment=MAX_SECRET_VIEWS={{ max_secret_views }}
+          Environment=MAX_FAILED_ATTEMPTS={{ max_failed_attempts }}
+
+          [Install]
+          WantedBy=multi-user.target
+        mode: "0644"
+      notify: Restart backend
+
+    - name: Enable and start backend service
+      become: true
+      ansible.builtin.systemd:
+        name: secret-share.service
+        enabled: true
+        state: started
+        daemon_reload: true
 
     - name: Write Caddy site config
       ansible.builtin.copy:
@@ -100,7 +77,7 @@
         content: |
           {{ domain }} {
               handle /api/* {
-                  reverse_proxy localhost:{{ container_port }}
+                  reverse_proxy localhost:{{ backend_port }}
               }
               handle {
                   root * {{ frontend_dir }}
@@ -110,19 +87,19 @@
           }
         mode: "0644"
 
+    - name: Reload Caddy
+      ansible.builtin.command:
+        cmd: sudo systemctl reload caddy
+      changed_when: true
+
     - name: Wait for backend health check
       ansible.builtin.uri:
-        url: "http://localhost:{{ container_port }}/health"
+        url: "http://localhost:{{ backend_port }}/health"
         status_code: 200
       register: health
       retries: 15
       delay: 2
       until: health.status == 200
-
-    - name: Reload Caddy
-      ansible.builtin.command:
-        cmd: sudo systemctl reload caddy
-      changed_when: true
 
     - name: Create cleanup systemd service
       become: true
@@ -131,13 +108,15 @@
         content: |
           [Unit]
           Description=SecretShare cleanup expired secrets
-          Requires=docker.service
-          After=docker.service
+          After=network.target postgresql.service
 
           [Service]
           Type=oneshot
-          ExecStart=/usr/bin/docker exec {{ container_name }} /app/cleanup
           User=deploy
+          WorkingDirectory={{ app_dir }}
+          ExecStart={{ app_dir }}/cleanup
+          Environment=DATABASE_URL={{ database_url }}
+          Environment=RUST_LOG=info
         mode: "0644"
 
     - name: Create cleanup systemd timer
@@ -162,4 +141,12 @@
         name: secret-share-cleanup.timer
         enabled: true
         state: started
+        daemon_reload: true
+
+  handlers:
+    - name: Restart backend
+      become: true
+      ansible.builtin.systemd:
+        name: secret-share.service
+        state: restarted
         daemon_reload: true
