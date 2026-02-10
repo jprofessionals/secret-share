@@ -210,7 +210,7 @@ jobs:
           cp backend/target/release/secret-share-backend deploy-package/
           cp backend/target/release/cleanup deploy-package/
           chmod +x deploy-package/secret-share-backend deploy-package/cleanup
-          cp -r frontend/dist deploy-package/frontend
+          cp -r frontend/build deploy-package/frontend
 
       - name: Install Ansible
         run: pip install ansible
