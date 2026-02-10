@@ -6,7 +6,7 @@
   vars:
     app_name: secret-share
     app_dir: /home/deploy/secret-share
-    frontend_dir: /var/www/secret-share
+    frontend_dir: /home/deploy/secret-share/frontend
     backend_port: 3000
     domain: "secret.{{ domain | default('jpro.dev') }}"
     database_url: "postgres://secret_share:{{ vault_secret_share_db_password }}@127.0.0.1:5432/secret_share_db"
@@ -17,27 +17,9 @@
     max_failed_attempts: 10
 
   tasks:
-    - name: Create frontend directory
-      become: true
-      ansible.builtin.file:
-        path: "{{ frontend_dir }}"
-        state: directory
-        owner: deploy
-        group: deploy
-        mode: "0755"
-
-    - name: Deploy frontend files
-      ansible.posix.synchronize:
-        src: "{{ app_dir }}/frontend/"
-        dest: "{{ frontend_dir }}/"
-        delete: true
-        recursive: true
-      delegate_to: "{{ inventory_hostname }}"
-
-    - name: Create backend systemd service
-      become: true
+    - name: Write backend systemd service file
       ansible.builtin.copy:
-        dest: /etc/systemd/system/secret-share.service
+        dest: /tmp/secret-share.service
         content: |
           [Unit]
           Description=SecretShare Backend
@@ -61,15 +43,55 @@
           [Install]
           WantedBy=multi-user.target
         mode: "0644"
-      notify: Restart backend
 
-    - name: Enable and start backend service
-      become: true
-      ansible.builtin.systemd:
-        name: secret-share.service
-        enabled: true
-        state: started
-        daemon_reload: true
+    - name: Write cleanup systemd service file
+      ansible.builtin.copy:
+        dest: /tmp/secret-share-cleanup.service
+        content: |
+          [Unit]
+          Description=SecretShare cleanup expired secrets
+          After=network.target postgresql.service
+
+          [Service]
+          Type=oneshot
+          User=deploy
+          WorkingDirectory={{ app_dir }}
+          ExecStart={{ app_dir }}/cleanup
+          Environment=DATABASE_URL={{ database_url }}
+          Environment=RUST_LOG=info
+        mode: "0644"
+
+    - name: Write cleanup systemd timer file
+      ansible.builtin.copy:
+        dest: /tmp/secret-share-cleanup.timer
+        content: |
+          [Unit]
+          Description=Run SecretShare cleanup daily
+
+          [Timer]
+          OnCalendar=daily
+          Persistent=true
+
+          [Install]
+          WantedBy=timers.target
+        mode: "0644"
+
+    - name: Install systemd service files
+      ansible.builtin.shell: |
+        sudo cp /tmp/secret-share.service /etc/systemd/system/
+        sudo cp /tmp/secret-share-cleanup.service /etc/systemd/system/
+        sudo cp /tmp/secret-share-cleanup.timer /etc/systemd/system/
+        rm /tmp/secret-share.service /tmp/secret-share-cleanup.service /tmp/secret-share-cleanup.timer
+      changed_when: true
+
+    - name: Reload systemd and restart backend
+      ansible.builtin.shell: |
+        sudo systemctl daemon-reload
+        sudo systemctl enable secret-share.service
+        sudo systemctl restart secret-share.service
+        sudo systemctl enable secret-share-cleanup.timer
+        sudo systemctl start secret-share-cleanup.timer
+      changed_when: true
 
     - name: Write Caddy site config
       ansible.builtin.copy:
@@ -88,8 +110,7 @@
         mode: "0644"
 
     - name: Reload Caddy
-      ansible.builtin.command:
-        cmd: sudo systemctl reload caddy
+      ansible.builtin.shell: sudo systemctl reload caddy
       changed_when: true
 
     - name: Wait for backend health check
@@ -100,53 +121,3 @@
       retries: 15
       delay: 2
       until: health.status == 200
-
-    - name: Create cleanup systemd service
-      become: true
-      ansible.builtin.copy:
-        dest: /etc/systemd/system/secret-share-cleanup.service
-        content: |
-          [Unit]
-          Description=SecretShare cleanup expired secrets
-          After=network.target postgresql.service
-
-          [Service]
-          Type=oneshot
-          User=deploy
-          WorkingDirectory={{ app_dir }}
-          ExecStart={{ app_dir }}/cleanup
-          Environment=DATABASE_URL={{ database_url }}
-          Environment=RUST_LOG=info
-        mode: "0644"
-
-    - name: Create cleanup systemd timer
-      become: true
-      ansible.builtin.copy:
-        dest: /etc/systemd/system/secret-share-cleanup.timer
-        content: |
-          [Unit]
-          Description=Run SecretShare cleanup daily
-
-          [Timer]
-          OnCalendar=daily
-          Persistent=true
-
-          [Install]
-          WantedBy=timers.target
-        mode: "0644"
-
-    - name: Enable and start cleanup timer
-      become: true
-      ansible.builtin.systemd:
-        name: secret-share-cleanup.timer
-        enabled: true
-        state: started
-        daemon_reload: true
-
-  handlers:
-    - name: Restart backend
-      become: true
-      ansible.builtin.systemd:
-        name: secret-share.service
-        state: restarted
-        daemon_reload: true
