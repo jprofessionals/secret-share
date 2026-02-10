@@ -8,9 +8,9 @@
     app_dir: /home/deploy/secret-share
     frontend_dir: /home/deploy/secret-share/frontend
     backend_port: 3000
-    domain: "secret.{{ domain | default('jpro.dev') }}"
+    app_domain: "secret.{{ domain | default('jpro.dev') }}"
     database_url: "postgres://secret_share:{{ vault_secret_share_db_password }}@127.0.0.1:5432/secret_share_db"
-    base_url: "https://{{ domain }}"
+    base_url: "https://{{ app_domain }}"
     rust_log: "info,secret_share_backend=debug"
     max_secret_days: 30
     max_secret_views: 100
@@ -97,7 +97,7 @@
       ansible.builtin.copy:
         dest: "/etc/caddy/sites/{{ app_name }}.caddy"
         content: |
-          {{ domain }} {
+          {{ app_domain }} {
               handle /api/* {
                   reverse_proxy localhost:{{ backend_port }}
               }
