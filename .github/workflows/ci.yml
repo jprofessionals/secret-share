@@ -61,6 +61,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: backend-release
+          path: backend/target/release
 
       - name: Run PostgreSQL tests
         run: |
@@ -78,6 +79,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: backend-release
+          path: backend/target/release
 
       - name: Run DynamoDB tests
         # Run single-threaded to avoid testcontainers concurrency issues
@@ -119,6 +121,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: backend-release
+          path: backend/target/release
 
       - name: Make backend binary executable
         run: chmod +x backend/target/release/secret-share-backend
@@ -186,6 +189,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: backend-release
+          path: backend/target/release
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
