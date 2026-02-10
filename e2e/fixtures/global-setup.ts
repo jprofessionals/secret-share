@@ -89,11 +89,16 @@ async function globalSetup(): Promise<void> {
     database === 'postgres' ? await startPostgres() : await startDynamoDB();
 
   // 2. Build and start backend
-  console.log('Building backend...');
-  execSync('cargo build --release', {
-    cwd: path.join(ROOT_DIR, 'backend'),
-    stdio: 'inherit',
-  });
+  const backendBinary = path.join(ROOT_DIR, 'backend/target/release/secret-share-backend');
+  if (!fs.existsSync(backendBinary)) {
+    console.log('Building backend...');
+    execSync('cargo build --release', {
+      cwd: path.join(ROOT_DIR, 'backend'),
+      stdio: 'inherit',
+    });
+  } else {
+    console.log('Using pre-built backend binary');
+  }
 
   console.log('Starting backend...');
   const backendProcess = spawn('./target/release/secret-share-backend', [], {

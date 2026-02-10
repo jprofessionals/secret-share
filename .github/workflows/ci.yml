@@ -7,8 +7,8 @@ on:
     branches: [main]
 
 jobs:
-  test-backend-postgres:
-    name: Backend Tests (PostgreSQL)
+  build-backend:
+    name: Build Backend
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,6 +20,39 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: backend -> target
+
+      - name: Build test binaries (all features)
+        working-directory: backend
+        run: cargo test --no-run --features postgres-tests,dynamodb-tests
+
+      - name: Build release binary
+        working-directory: backend
+        run: cargo build --release
+
+      - name: Upload backend artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-build
+          path: |
+            backend/target/debug/deps/
+            backend/target/release/secret-share-backend
+          retention-days: 1
+
+  test-backend-postgres:
+    name: Backend Tests (PostgreSQL)
+    needs: [build-backend]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Download backend artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-build
+          path: backend
 
       - name: Run PostgreSQL tests
         working-directory: backend
@@ -27,6 +60,7 @@ jobs:
 
   test-backend-dynamodb:
     name: Backend Tests (DynamoDB)
+    needs: [build-backend]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -34,10 +68,11 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Cache Cargo
-        uses: Swatinem/rust-cache@v2
+      - name: Download backend artifacts
+        uses: actions/download-artifact@v4
         with:
-          workspaces: backend -> target
+          name: backend-build
+          path: backend
 
       - name: Run DynamoDB tests
         working-directory: backend
@@ -67,17 +102,19 @@ jobs:
 
   test-e2e:
     name: E2E Tests (PostgreSQL)
+    needs: [build-backend]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache Cargo
-        uses: Swatinem/rust-cache@v2
+      - name: Download backend artifacts
+        uses: actions/download-artifact@v4
         with:
-          workspaces: backend -> target
+          name: backend-build
+          path: backend
+
+      - name: Make backend binary executable
+        run: chmod +x backend/target/release/secret-share-backend
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
