@@ -15,7 +15,8 @@ RUN cargo build --release
 # Remove dummy files
 RUN rm -rf src
 
-# Copy source code
+# Copy migrations and source code
+COPY migrations ./migrations
 COPY src ./src
 
 # Build the application
