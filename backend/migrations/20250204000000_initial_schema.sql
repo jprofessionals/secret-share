@@ -1,5 +1,5 @@
 -- Initial schema for secrets table
-CREATE TABLE IF NOT EXISTS secrets (
+CREATE TABLE secrets (
     id UUID PRIMARY KEY,
     encrypted_data TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -11,4 +11,4 @@ CREATE TABLE IF NOT EXISTS secrets (
 );
 
 -- Index for cleanup queries
-CREATE INDEX IF NOT EXISTS idx_secrets_expires_at ON secrets(expires_at);
+CREATE INDEX idx_secrets_expires_at ON secrets(expires_at);
