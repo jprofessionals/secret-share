@@ -5,6 +5,7 @@ export default {
   // Layout - Nav
   'layout.nav.home': 'Home',
   'layout.nav.share': 'Share secret',
+  'layout.nav.confirmNewSecret': 'Leave this page and create a new secret?',
 
   // Layout - Footer
   'layout.footer.tagline': 'End-to-end encrypted • Self-destructing • Open source',

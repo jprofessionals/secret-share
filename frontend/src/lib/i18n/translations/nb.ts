@@ -5,6 +5,7 @@ export default {
   // Layout - Nav
   'layout.nav.home': 'Hjem',
   'layout.nav.share': 'Del hemmelighet',
+  'layout.nav.confirmNewSecret': 'Forlate denne siden og opprette en ny hemmelighet?',
 
   // Layout - Footer
   'layout.footer.tagline': 'End-to-end kryptert • Selvdestruerende • Åpen kildekode',

@@ -3,12 +3,22 @@
   import { onMount } from 'svelte';
   import { t, initI18n } from '$lib/i18n/index.svelte';
   import LanguageSwitcher from '$lib/components/LanguageSwitcher.svelte';
+  import { page } from '$app/state';
 
   let { children } = $props();
 
   onMount(() => {
     initI18n();
   });
+
+  function handleShareClick(e: MouseEvent) {
+    if (page.url.pathname === '/create') {
+      e.preventDefault();
+      if (confirm(t('layout.nav.confirmNewSecret'))) {
+        window.location.href = '/create';
+      }
+    }
+  }
 </script>
 
 <svelte:head>
@@ -35,6 +45,7 @@
           </a>
           <a
             href="/create"
+            onclick={handleShareClick}
             class="px-4 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors shadow-sm"
           >
             {t('layout.nav.share')}
